@@ -12,6 +12,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 var userCollection *mongo.Collection = configs.GetCollection(configs.DB, "users")
@@ -135,6 +136,37 @@ func GetAllUsers() gin.HandlerFunc {
 		defer cancel()
 
 		results, err := userCollection.Find(ctx, bson.M{})
+
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"data": err.Error()})
+			return
+		}
+
+		defer results.Close(ctx)
+		for results.Next(ctx) {
+			var singleUser models.User
+			if err = results.Decode(&singleUser); err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"data": err.Error()})
+			}
+
+			users = append(users, singleUser)
+		}
+
+		c.JSON(http.StatusOK, gin.H{"data": users})
+
+	}
+}
+
+func GetAllUsersTop() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		var users []models.User
+		defer cancel()
+
+		findOptions := options.Find()
+		findOptions.SetLimit(10)
+		findOptions.SetSort(bson.D{{Key: "score", Value: -1}})
+		results, err := userCollection.Find(ctx, bson.D{}, findOptions)
 
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"data": err.Error()})
