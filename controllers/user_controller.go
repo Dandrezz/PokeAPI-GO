@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"pokemon-api/configs"
 	"pokemon-api/models"
-	"pokemon-api/responses"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -24,15 +23,13 @@ func CreateUser() gin.HandlerFunc {
 		var user models.User
 		defer cancel()
 
-		//validate the request body
 		if err := c.BindJSON(&user); err != nil {
-			c.JSON(http.StatusBadRequest, responses.UserResponse{Status: http.StatusBadRequest, Message: "error", Data: map[string]interface{}{"data": err.Error()}})
+			c.JSON(http.StatusBadRequest, gin.H{"data": err.Error()})
 			return
 		}
 
-		//use the validator library to validate required fields
 		if validationErr := validate.Struct(&user); validationErr != nil {
-			c.JSON(http.StatusBadRequest, responses.UserResponse{Status: http.StatusBadRequest, Message: "error", Data: map[string]interface{}{"data": validationErr.Error()}})
+			c.JSON(http.StatusBadRequest, gin.H{"data": validationErr.Error()})
 			return
 		}
 
@@ -44,11 +41,11 @@ func CreateUser() gin.HandlerFunc {
 
 		result, err := userCollection.InsertOne(ctx, newUser)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, responses.UserResponse{Status: http.StatusInternalServerError, Message: "error", Data: map[string]interface{}{"data": err.Error()}})
+			c.JSON(http.StatusInternalServerError, gin.H{"data": err.Error()})
 			return
 		}
 
-		c.JSON(http.StatusCreated, responses.UserResponse{Status: http.StatusCreated, Message: "success", Data: map[string]interface{}{"data": result}})
+		c.JSON(http.StatusCreated, gin.H{"data": result})
 	}
 }
 
@@ -61,13 +58,13 @@ func GetAUser() gin.HandlerFunc {
 
 		objId, _ := primitive.ObjectIDFromHex(userId)
 
-		err := userCollection.FindOne(ctx, bson.M{"id": objId}).Decode(&user)
+		err := userCollection.FindOne(ctx, bson.M{"_id": objId}).Decode(&user)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, responses.UserResponse{Status: http.StatusInternalServerError, Message: "error", Data: map[string]interface{}{"data": err.Error()}})
+			c.JSON(http.StatusInternalServerError, gin.H{"data": err.Error()})
 			return
 		}
 
-		c.JSON(http.StatusOK, responses.UserResponse{Status: http.StatusOK, Message: "success", Data: map[string]interface{}{"data": user}})
+		c.JSON(http.StatusOK, gin.H{"data": user})
 	}
 }
 
@@ -79,36 +76,32 @@ func EditAUser() gin.HandlerFunc {
 		defer cancel()
 		objId, _ := primitive.ObjectIDFromHex(userId)
 
-		//validate the request body
 		if err := c.BindJSON(&user); err != nil {
-			c.JSON(http.StatusBadRequest, responses.UserResponse{Status: http.StatusBadRequest, Message: "error", Data: map[string]interface{}{"data": err.Error()}})
+			c.JSON(http.StatusBadRequest, gin.H{"data": err.Error()})
 			return
 		}
 
-		//use the validator library to validate required fields
 		if validationErr := validate.Struct(&user); validationErr != nil {
-			c.JSON(http.StatusBadRequest, responses.UserResponse{Status: http.StatusBadRequest, Message: "error", Data: map[string]interface{}{"data": validationErr.Error()}})
+			c.JSON(http.StatusBadRequest, gin.H{"data": validationErr.Error()})
 			return
 		}
 
 		update := bson.M{"name": user.Name, "score": user.Score}
-		result, err := userCollection.UpdateOne(ctx, bson.M{"id": objId}, bson.M{"$set": update})
+		result, err := userCollection.UpdateOne(ctx, bson.M{"_id": objId}, bson.M{"$set": update})
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, responses.UserResponse{Status: http.StatusInternalServerError, Message: "error", Data: map[string]interface{}{"data": err.Error()}})
+			c.JSON(http.StatusInternalServerError, gin.H{"data": err.Error()})
 			return
 		}
 
-		//get updated user details
 		var updatedUser models.User
 		if result.MatchedCount == 1 {
-			err := userCollection.FindOne(ctx, bson.M{"id": objId}).Decode(&updatedUser)
+			err := userCollection.FindOne(ctx, bson.M{"_id": objId}).Decode(&updatedUser)
 			if err != nil {
-				c.JSON(http.StatusInternalServerError, responses.UserResponse{Status: http.StatusInternalServerError, Message: "error", Data: map[string]interface{}{"data": err.Error()}})
+				c.JSON(http.StatusInternalServerError, gin.H{"data": err.Error()})
 				return
 			}
 		}
-
-		c.JSON(http.StatusOK, responses.UserResponse{Status: http.StatusOK, Message: "success", Data: map[string]interface{}{"data": updatedUser}})
+		c.JSON(http.StatusOK, gin.H{"data": updatedUser})
 	}
 }
 
@@ -120,29 +113,20 @@ func DeleteAUser() gin.HandlerFunc {
 
 		objId, _ := primitive.ObjectIDFromHex(userId)
 
-		result, err := userCollection.DeleteOne(ctx, bson.M{"id": objId})
+		result, err := userCollection.DeleteOne(ctx, bson.M{"_id": objId})
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, responses.UserResponse{Status: http.StatusInternalServerError, Message: "error", Data: map[string]interface{}{"data": err.Error()}})
+			c.JSON(http.StatusInternalServerError, gin.H{"data": err.Error()})
 			return
 		}
 
 		if result.DeletedCount < 1 {
-			c.JSON(http.StatusNotFound,
-				responses.UserResponse{Status: http.StatusNotFound, Message: "error", Data: map[string]interface{}{"data": "User with specified ID not found!"}},
-			)
+			c.JSON(http.StatusNotFound, gin.H{"data": "User with specified ID not found!"})
 			return
 		}
 
-		c.JSON(http.StatusOK,
-			responses.UserResponse{Status: http.StatusOK, Message: "success", Data: map[string]interface{}{"data": "User successfully deleted!"}},
-		)
+		c.JSON(http.StatusOK, gin.H{"data": "User successfully deleted!"})
 	}
 }
-
-// @Summary Get all users
-// @Accept  json
-// @Produce  json
-// @Success 200 {string} string	"ok"
 
 func GetAllUsers() gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -153,23 +137,21 @@ func GetAllUsers() gin.HandlerFunc {
 		results, err := userCollection.Find(ctx, bson.M{})
 
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, responses.UserResponse{Status: http.StatusInternalServerError, Message: "error", Data: map[string]interface{}{"data": err.Error()}})
+			c.JSON(http.StatusInternalServerError, gin.H{"data": err.Error()})
 			return
 		}
 
-		//reading from the db in an optimal way
 		defer results.Close(ctx)
 		for results.Next(ctx) {
 			var singleUser models.User
 			if err = results.Decode(&singleUser); err != nil {
-				c.JSON(http.StatusInternalServerError, responses.UserResponse{Status: http.StatusInternalServerError, Message: "error", Data: map[string]interface{}{"data": err.Error()}})
+				c.JSON(http.StatusInternalServerError, gin.H{"data": err.Error()})
 			}
 
 			users = append(users, singleUser)
 		}
 
-		c.JSON(http.StatusOK,
-			responses.UserResponse{Status: http.StatusOK, Message: "success", Data: map[string]interface{}{"data": users}},
-		)
+		c.JSON(http.StatusOK, gin.H{"data": users})
+
 	}
 }
